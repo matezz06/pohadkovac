@@ -52,3 +52,6 @@ button.small { padding: 3px 10px; font-size: 13px; }
 .checks label { display: inline-flex; flex-direction: row; gap: 4px; align-items: center; color: var(--ink); }
 .checks input { width: auto; }
 .thumb.portrait { aspect-ratio: 4/5; max-height: 420px; object-fit: contain; }
+.grid > * { min-width: 0; }
+.err { overflow-wrap: anywhere; }
+.mock-banner { background: #ffd54a; color: #3a2c00; text-align: center; padding: 6px 12px; font-size: 14px; font-weight: 600; }

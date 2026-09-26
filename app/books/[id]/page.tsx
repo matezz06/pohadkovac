@@ -21,6 +21,10 @@ export default function BookPage({ params }: { params: Promise<{ id: string }> }
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState("");
   const autoStarted = useRef(false);
+  const [mock, setMock] = useState(false);
+  useEffect(() => { fetch("/api/settings").then((r) => r.json()).then((s) => setMock(!!s.mock)); }, []);
+  // v ostrém režimu ber zástupné (mock) obrázky jako chybějící
+  const isMissing = useCallback((f?: string) => !f || (!mock && f.startsWith("mock-")), [mock]);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/books/${id}`);
@@ -51,7 +55,7 @@ export default function BookPage({ params }: { params: Promise<{ id: string }> }
   }, [id]);
 
   const runAll = useCallback(async (b: Book) => {
-    const missingSheets = b.characters.filter((c) => !c.sheet);
+    const missingSheets = b.characters.filter((c) => isMissing(c.sheet));
     if (missingSheets.length) {
       setStatus(`Kreslím karty postav (${missingSheets.length})…`);
       await pool(missingSheets, 2, async (c) => { await act(`sheet-${c.id}`, { action: "sheet", cid: c.id }); });
@@ -63,7 +67,7 @@ export default function BookPage({ params }: { params: Promise<{ id: string }> }
       if (!r) return setStatus("");
       cur = r;
     }
-    const missing = cur.pages.filter((p) => !p.image);
+    const missing = cur.pages.filter((p) => isMissing(p.image));
     let done = 0;
     setStatus(`Kreslím ilustrace 0/${missing.length}…`);
     await pool(missing, 2, async (p) => {
@@ -72,7 +76,7 @@ export default function BookPage({ params }: { params: Promise<{ id: string }> }
     });
     setStatus("");
     load();
-  }, [act, load]);
+  }, [act, load, isMissing]);
 
   useEffect(() => {
     if (book && search.get("auto") === "1" && !autoStarted.current) {

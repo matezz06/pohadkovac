@@ -38,9 +38,21 @@ async function call(model: string, body: unknown, attempt = 0): Promise<any> {
   });
   if (!res.ok) {
     const txt = await res.text();
-    if ((res.status === 429 || res.status >= 500) && attempt < 3) {
-      await new Promise((r) => setTimeout(r, 2000 * 2 ** attempt));
+    // Free tier bez nároku na tento model (limit 0) – čekání nepomůže.
+    if (res.status === 429 && /limit: 0\b/.test(txt)) {
+      throw new Error(
+        `Model ${model} není v bezplatném režimu dostupný. Zapni placení (billing) v Google AI Studio → Billing, pak to zkus znovu.`,
+      );
+    }
+    if ((res.status === 429 || res.status >= 500) && attempt < 4) {
+      // Google posílá, za kolik sekund to zkusit znovu ("retry in 15.8s")
+      const m = txt.match(/retry in ([\d.]+)s/i) ?? txt.match(/"retryDelay":\s*"(\d+)s"/);
+      const wait = m ? Math.min(60, Number(m[1]) + 1) * 1000 : 2000 * 2 ** attempt;
+      await new Promise((r) => setTimeout(r, wait));
       return call(model, body, attempt + 1);
+    }
+    if (res.status === 429) {
+      throw new Error(`Překročen limit požadavků u modelu ${model}. Počkej minutu a zkus to znovu (nebo zapni billing pro vyšší limity).`);
     }
     throw new Error(`Gemini ${res.status}: ${txt.slice(0, 500)}`);
   }

@@ -35,7 +35,7 @@ export async function storePhoto(bookId: string, data: Buffer) {
 }
 
 async function storeGenerated(bookId: string, prefix: string, data: Buffer) {
-  const name = `${prefix}-${newId()}.png`;
+  const name = `${isMock() ? "mock-" : ""}${prefix}-${newId()}.png`;
   await writeBookFile(bookId, name, await sharp(data).png().toBuffer());
   return name;
 }
@@ -63,7 +63,7 @@ export async function generateSheet(bookId: string, cid: string) {
   let book = await must(bookId);
   let c = book.characters.find((x) => x.id === cid);
   if (!c) throw new Error("Postava nenalezena");
-  if (!c.visual && c.photos.length) {
+  if ((!c.visual || c.visual.startsWith("(mock)")) && c.photos.length && !isMock()) {
     book = await describeCharacter(bookId, cid);
     c = book.characters.find((x) => x.id === cid)!;
   }
