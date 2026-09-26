@@ -3,7 +3,8 @@ import { loadSettings } from "./store";
 
 const API_BASE = process.env.GEMINI_API_BASE || "https://generativelanguage.googleapis.com/v1beta";
 
-export const isMock = () => process.env.GEMINI_MOCK === "1";
+// "npm run mock" zapne testovací režim i na Windows (bez nastavování proměnných)
+export const isMock = () => process.env.GEMINI_MOCK === "1" || process.env.npm_lifecycle_event === "mock";
 
 export type Usage = { model: string; inputTokens: number; outputTokens: number; images: number };
 
