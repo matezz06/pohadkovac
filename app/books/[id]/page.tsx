@@ -3,7 +3,8 @@ import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
-import type { Book, Page } from "@/lib/types";
+import type { Book, Page, TextLength } from "@/lib/types";
+import { TEXT_LENGTHS } from "@/lib/prompts";
 
 const f = (id: string, name?: string) => (name ? `/api/files/${id}/${name}` : undefined);
 
@@ -67,16 +68,27 @@ export default function BookPage({ params }: { params: Promise<{ id: string }> }
       if (!r) return setStatus("");
       cur = r;
     }
-    const missing = cur.pages.filter((p) => isMissing(p.image));
+    await drawPages(cur, cur.pages.filter((p) => isMissing(p.image)));
+  }, [act, isMissing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Strany ze stejného místa kreslí postupně (každá navazuje pozadím na předchozí), různá místa souběžně. */
+  const drawPages = useCallback(async (b: Book, pages: Page[]) => {
+    const groups = new Map<string, Page[]>();
+    for (const p of [...pages].sort((a, c) => a.n - c.n)) {
+      const k = p.n > 0 && p.location ? `loc:${p.location}` : `page:${p.n}`;
+      groups.set(k, [...(groups.get(k) ?? []), p]);
+    }
     let done = 0;
-    setStatus(`Kreslím ilustrace 0/${missing.length}…`);
-    await pool(missing, 2, async (p) => {
-      await act(`page-${p.n}`, { action: "page", n: p.n });
-      setStatus(`Kreslím ilustrace ${++done}/${missing.length}…`);
+    setStatus(`Kreslím ilustrace 0/${pages.length}…`);
+    await pool([...groups.values()], 2, async (g) => {
+      for (const p of g) {
+        await act(`page-${p.n}`, { action: "page", n: p.n });
+        setStatus(`Kreslím ilustrace ${++done}/${pages.length}…`);
+      }
     });
     setStatus("");
     load();
-  }, [act, load, isMissing]);
+  }, [act, load]);
 
   useEffect(() => {
     if (book && search.get("auto") === "1" && !autoStarted.current) {
@@ -144,12 +156,57 @@ export default function BookPage({ params }: { params: Promise<{ id: string }> }
       </div>
 
       <h2>2. Příběh a ilustrace</h2>
+      <div className="card stack" style={{ marginBottom: 12 }}>
+        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+          <label>Délka textu na stranu
+            <select value={book.textLength ?? "medium"} onChange={(e) => patch({ textLength: e.target.value as TextLength })}>
+              {Object.entries(TEXT_LENGTHS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+          </label>
+          <label>Počet stran
+            <input type="number" min={3} max={20} defaultValue={book.pageCount} key={book.pageCount}
+              onBlur={(e) => Number(e.target.value) !== book.pageCount && patch({ pageCount: Number(e.target.value) })} />
+          </label>
+        </div>
+        <label>O čem má pohádka být
+          <textarea defaultValue={book.theme} key={book.theme} onBlur={(e) => e.target.value !== book.theme && patch({ theme: e.target.value })} />
+        </label>
+        <p className="muted" style={{ margin: 0 }}>Změny se projeví při dalším „Napsat příběh znovu“.</p>
+      </div>
       <div className="row" style={{ marginBottom: 12 }}>
         <button disabled={busy.story} onClick={() => confirm(book.pages.length ? "Přepsat celý příběh? Ilustrace se smažou." : "Napsat příběh?") && act("story", { action: "story" })}>
           {busy.story ? <><span className="spin" /> Píšu…</> : book.pages.length ? "↻ Napsat příběh znovu" : "Napsat příběh"}
         </button>
+        {book.pages.length > 0 && (
+          <button disabled={busy.locations} title="Texty zůstanou, jen se sjednotí prostředí ilustrací"
+            onClick={() => act("locations", { action: "locations" })}>
+            {busy.locations ? <><span className="spin" /> Sjednocuji…</> : "Sjednotit prostředí"}
+          </button>
+        )}
+        {book.pages.length > 0 && (
+          <button disabled={anyBusy} onClick={() => confirm("Překreslit všechny ilustrace? Staré verze zůstanou k výběru.") && drawPages(book, book.pages)}>
+            ↻ Překreslit všechny ilustrace
+          </button>
+        )}
         {errors.story && <span className="err">{errors.story}</span>}
+        {errors.locations && <span className="err">{errors.locations}</span>}
       </div>
+      {(book.locations?.length ?? 0) > 0 && (
+        <details className="card" style={{ marginBottom: 12 }}>
+          <summary><strong>Prostředí</strong> <span className="muted">– {book.locations!.map((l) => l.name).join(", ")}</span></summary>
+          <div className="stack" style={{ marginTop: 12 }}>
+            <label>Atmosféra celé knížky (anglicky)
+              <input defaultValue={book.atmosphere ?? ""} key={book.atmosphere} onBlur={(e) => e.target.value !== (book.atmosphere ?? "") && patch({ atmosphere: e.target.value })} />
+            </label>
+            {book.locations!.map((l, i) => (
+              <label key={l.id}>{l.name} (anglicky)
+                <textarea defaultValue={l.description} key={l.description} rows={2}
+                  onBlur={(e) => e.target.value !== l.description && patch({ locations: book.locations!.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)) })} />
+              </label>
+            ))}
+          </div>
+        </details>
+      )}
       <div className="stack">
         {book.pages.map((p) => (
           <PageEditor key={p.n} book={book} page={p} busy={!!busy[`page-${p.n}`]} error={errors[`page-${p.n}`]}
@@ -205,6 +262,14 @@ function PageEditor({ book, page, busy, error, onGenerate, onPatch }: {
             </label>
           ))}
         </div>
+        {page.n > 0 && (book.locations?.length ?? 0) > 0 && (
+          <label>Místo
+            <select value={page.location ?? ""} onChange={(e) => onPatch({ location: e.target.value })}>
+              <option value="">(neurčeno)</option>
+              {book.locations!.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </label>
+        )}
       </div>
     </div>
   );

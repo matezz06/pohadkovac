@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import { STYLES } from "@/lib/styles";
+import { TEXT_LENGTHS } from "@/lib/prompts";
+import type { TextLength } from "@/lib/types";
 
 type C = { name: string; role: string; description: string; isHero: boolean; files: File[] };
 
@@ -23,6 +25,7 @@ export default function NewBook() {
   const [theme, setTheme] = useState("");
   const [lesson, setLesson] = useState("");
   const [pageCount, setPageCount] = useState(10);
+  const [textLength, setTextLength] = useState<TextLength>("medium");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -41,6 +44,7 @@ export default function NewBook() {
     fd.set("theme", theme);
     fd.set("lesson", lesson);
     fd.set("pageCount", String(pageCount));
+    fd.set("textLength", textLength);
     fd.set("characters", JSON.stringify(valid.map(({ files, ...c }) => c)));
     valid.forEach((c, i) => c.files.forEach((f) => fd.append(`photo_${i}`, f)));
     const res = await fetch("/api/books", { method: "POST", body: fd });
@@ -97,6 +101,11 @@ export default function NewBook() {
           <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
             <label>Věk dítěte<input type="number" min={1} max={10} value={age} onChange={(e) => setAge(Number(e.target.value))} /></label>
             <label>Počet stran<input type="number" min={3} max={20} value={pageCount} onChange={(e) => setPageCount(Number(e.target.value))} /></label>
+            <label>Délka textu na stranu
+              <select value={textLength} onChange={(e) => setTextLength(e.target.value as TextLength)}>
+                {Object.entries(TEXT_LENGTHS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </label>
             <label>Styl ilustrací
               <select value={styleId} onChange={(e) => setStyleId(e.target.value)}>
                 {STYLES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}

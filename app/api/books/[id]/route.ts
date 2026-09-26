@@ -14,7 +14,7 @@ export async function GET(_: Request, { params }: Ctx) {
 export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params;
   const patch = (await req.json()) as Partial<Book> & {
-    page?: { n: number; text?: string; scene?: string; characters?: string[]; image?: string };
+    page?: { n: number; text?: string; scene?: string; characters?: string[]; image?: string; location?: string };
     character?: { id: string; visual?: string; description?: string; name?: string; role?: string; sheet?: string };
   };
   const book = await updateBook(id, (b) => {
@@ -23,7 +23,10 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (patch.customStyle !== undefined) b.customStyle = patch.customStyle;
     if (patch.theme !== undefined) b.theme = patch.theme;
     if (patch.lesson !== undefined) b.lesson = patch.lesson;
-    if (patch.pageCount !== undefined) b.pageCount = patch.pageCount;
+    if (patch.pageCount !== undefined) b.pageCount = Math.min(20, Math.max(3, Number(patch.pageCount)));
+    if (patch.textLength !== undefined) b.textLength = patch.textLength;
+    if (patch.atmosphere !== undefined) b.atmosphere = patch.atmosphere;
+    if (patch.locations !== undefined) b.locations = patch.locations;
     if (patch.page) {
       const p = b.pages.find((x) => x.n === patch.page!.n);
       if (p) {

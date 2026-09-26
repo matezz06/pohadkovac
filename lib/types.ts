@@ -19,6 +19,8 @@ export type Page = {
   text: string;
   scene: string;
   characters: string[]; // character ids
+  /** id of Book.locations – pages in the same place share background */
+  location?: string;
   image?: string;
   imageVersions?: string[];
 };
@@ -32,6 +34,10 @@ export type UsageEntry = {
   images: number;
 };
 
+export type Location = { id: string; name: string; description: string };
+
+export type TextLength = "short" | "medium" | "long";
+
 export type Book = {
   id: string;
   createdAt: string;
@@ -42,7 +48,11 @@ export type Book = {
   theme: string;
   lesson?: string;
   pageCount: number;
+  textLength?: TextLength;
   language: string;
+  /** season, time of day, weather – same for the whole book */
+  atmosphere?: string;
+  locations?: Location[];
   title?: string;
   characters: Character[];
   pages: Page[];

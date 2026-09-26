@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { describeCharacter, generatePageImage, generateSheet, generateStory } from "@/lib/pipeline";
+import { assignLocations, describeCharacter, generatePageImage, generateSheet, generateStory } from "@/lib/pipeline";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -16,6 +16,8 @@ export async function POST(req: Request, { params }: Ctx) {
         return NextResponse.json(await generateSheet(id, cid));
       case "story":
         return NextResponse.json(await generateStory(id));
+      case "locations":
+        return NextResponse.json(await assignLocations(id));
       case "page":
         return NextResponse.json(await generatePageImage(id, Number(n)));
       default:

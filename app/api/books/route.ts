@@ -38,6 +38,7 @@ export async function POST(req: Request) {
     theme: String(fd.get("theme") ?? ""),
     lesson: String(fd.get("lesson") ?? "") || undefined,
     pageCount: Math.min(20, Math.max(3, Number(fd.get("pageCount") ?? 10))),
+    textLength: (["short", "medium", "long"].includes(String(fd.get("textLength"))) ? String(fd.get("textLength")) : "medium") as Book["textLength"],
     language: "cs",
     characters,
     pages: [],

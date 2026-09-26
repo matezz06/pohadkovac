@@ -8,6 +8,8 @@ import {
   STORY_SYSTEM,
   storyPrompt,
   visualDescriptionPrompt,
+  locationsPrompt,
+  LOCATIONS_SCHEMA,
 } from "./prompts";
 import type { Book, Page, UsageEntry } from "./types";
 
@@ -83,7 +85,9 @@ type StoryJson = {
   title: string;
   coverScene: string;
   coverCharacters: string[];
-  pages: { text: string; scene: string; characters: string[] }[];
+  atmosphere?: string;
+  locations?: { id: string; name: string; description: string }[];
+  pages: { text: string; scene: string; characters: string[]; location?: string }[];
 };
 
 function mockStory(book: Book): StoryJson {
@@ -93,12 +97,18 @@ function mockStory(book: Book): StoryJson {
     title: `${hero?.name ?? book.childName} a velké dobrodružství`,
     coverScene: "All characters standing together in a sunny meadow",
     coverCharacters: ids.slice(0, 4),
+    atmosphere: "sunny late summer afternoon",
+    locations: [
+      { id: "garden", name: "zahrada", description: "a cozy family garden with a wooden fence and an apple tree" },
+      { id: "meadow", name: "louka", description: "a flowery meadow with a small pond" },
+    ],
     pages: Array.from({ length: book.pageCount }, (_, i) => {
       const c = book.characters[i % book.characters.length];
       return {
         text: `Strana ${i + 1}. ${hero?.name} potkala ${c?.name}. „Hop a skok, už je tu zas!“`,
         scene: `Page ${i + 1}: ${hero?.name} and ${c?.name} playing in the garden`,
         characters: Array.from(new Set([hero?.id, c?.id].filter(Boolean) as string[])),
+        location: i < book.pageCount / 2 ? "garden" : "meadow",
       };
     }),
   };
@@ -118,8 +128,11 @@ export async function generateStory(bookId: string) {
   const clean = (ids: string[]) => (ids ?? []).filter((id) => valid.has(id)).slice(0, 4);
   return updateBook(bookId, (b) => {
     b.title = story.title;
+    b.atmosphere = story.atmosphere;
+    b.locations = story.locations ?? [];
+    const locIds = new Set(b.locations.map((l) => l.id));
     const cover: Page = { n: 0, text: story.title, scene: story.coverScene, characters: clean(story.coverCharacters) };
-    b.pages = [cover, ...story.pages.map((p, i) => ({ n: i + 1, text: p.text, scene: p.scene, characters: clean(p.characters) }))];
+    b.pages = [cover, ...story.pages.map((p, i) => ({ n: i + 1, text: p.text, scene: p.scene, characters: clean(p.characters), location: p.location && locIds.has(p.location) ? p.location : undefined }))];
     if (u) b.usage.push(usage("story", u));
   });
 }
@@ -136,7 +149,20 @@ export async function generatePageImage(bookId: string, n: number) {
     if (c.sheet) refs.push(await img(bookId, c.sheet));
     else if (c.photos[0]) refs.push(await img(bookId, c.photos[0]));
   }
-  const input: InputPart[] = [{ text: pageImagePrompt(book, page.scene, chars, n === 0) }, ...refs];
+  // Pozadí: předchozí nakreslená strana ze stejného místa slouží jako předloha prostředí.
+  const location = book.locations?.find((l) => l.id === page.location);
+  let envRef: InputPart | null = null;
+  if (n > 0 && page.location) {
+    const prev = book.pages
+      .filter((p) => p.n > 0 && p.n < n && p.location === page.location && p.image && (isMock() || !p.image.startsWith("mock-")))
+      .sort((a, b) => b.n - a.n)[0];
+    if (prev?.image) envRef = await img(bookId, prev.image);
+  }
+  const input: InputPart[] = [
+    { text: pageImagePrompt(book, page.scene, chars, n === 0, location, !!envRef) },
+    ...refs,
+    ...(envRef ? [envRef] : []),
+  ];
   const r = await generateImage(input, { aspectRatio: n === 0 ? "4:3" : "4:5", mockLabel: n === 0 ? "obálka" : `strana ${n}` });
   const file = await storeGenerated(bookId, `page-${n}`, r.image);
   return updateBook(bookId, (b) => {
@@ -144,5 +170,37 @@ export async function generatePageImage(bookId: string, n: number) {
     p.image = file;
     p.imageVersions = [...(p.imageVersions ?? []), file];
     b.usage.push(usage("page", r.usage));
+  });
+}
+
+/** Doplní k hotovému příběhu místa a sjednotí scény – texty zůstanou. */
+export async function assignLocations(bookId: string) {
+  const book = await must(bookId);
+  if (!book.pages.length) throw new Error("Nejdřív napiš příběh");
+  type R = { atmosphere: string; locations: { id: string; name: string; description: string }[]; pages: { n: number; location: string; scene: string }[] };
+  let res: R;
+  let u: Usage | null = null;
+  if (isMock()) {
+    res = {
+      atmosphere: "sunny late summer afternoon",
+      locations: [{ id: "garden", name: "zahrada", description: "a cozy garden with a wooden fence" }],
+      pages: book.pages.filter((p) => p.n > 0).map((p) => ({ n: p.n, location: "garden", scene: p.scene })),
+    };
+  } else {
+    const r = await generateText([{ text: locationsPrompt(book) }], { schema: LOCATIONS_SCHEMA, temperature: 0.4 });
+    res = JSON.parse(r.text);
+    u = r.usage;
+  }
+  return updateBook(bookId, (b) => {
+    b.atmosphere = res.atmosphere;
+    b.locations = res.locations;
+    const ids = new Set(res.locations.map((l) => l.id));
+    for (const x of res.pages) {
+      const p = b.pages.find((q) => q.n === x.n);
+      if (!p || p.n === 0) continue;
+      if (ids.has(x.location)) p.location = x.location;
+      if (x.scene) p.scene = x.scene;
+    }
+    if (u) b.usage.push(usage("story", u));
   });
 }
