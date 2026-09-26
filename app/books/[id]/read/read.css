@@ -1,0 +1,31 @@
+.reader { padding: 16px; display: grid; gap: 24px; justify-items: center; }
+.reader .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%; max-width: 1000px; }
+.sheet { width: 100%; max-width: 1000px; aspect-ratio: 297 / 210; background: #fffdf8; border-radius: 12px; box-shadow: 0 4px 24px #0001;
+  overflow: hidden; display: grid; grid-template-columns: 1.35fr 1fr; position: relative; }
+.sheet .art { background: #f3ebdf; }
+.sheet .art img, .sheet.cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sheet .missing { height: 100%; display: grid; place-items: center; color: #999; }
+.sheet .text { display: flex; align-items: center; padding: 6% 7%; position: relative; }
+.sheet .text p { font-family: Georgia, "Times New Roman", serif; font-size: clamp(16px, 2.6vw, 28px); line-height: 1.55; margin: 0; }
+.sheet .num { position: absolute; bottom: 4%; right: 6%; color: #aaa; font-size: 14px; }
+.sheet.cover { display: block; }
+.sheet.cover h1 { position: absolute; top: 5%; left: 0; right: 0; text-align: center; margin: 0; padding: 0 8%;
+  font-family: Georgia, serif; font-size: clamp(24px, 5vw, 56px); color: #fff; text-shadow: 0 2px 12px #0008, 0 0 2px #0006; }
+.sheet.end { display: grid; place-content: center; text-align: center; grid-template-columns: 1fr; }
+.sheet.end p:first-child { font-family: Georgia, serif; font-size: 40px; margin: 0; }
+@media (max-width: 640px) {
+  .sheet { grid-template-columns: 1fr; aspect-ratio: auto; }
+  .sheet .art { aspect-ratio: 4/3; }
+  .sheet.cover { aspect-ratio: 4/3; }
+  .sheet.end { aspect-ratio: 4/3; }
+}
+@page { size: A4 landscape; margin: 0; }
+@media print {
+  html, body { background: #fff; }
+  .no-print { display: none !important; }
+  .reader { padding: 0; gap: 0; display: block; }
+  .sheet { width: 297mm; height: 210mm; max-width: none; aspect-ratio: auto; border-radius: 0; box-shadow: none; break-after: page; page-break-after: always; }
+  .sheet .text p { font-size: 22pt; }
+  .sheet.cover h1 { font-size: 40pt; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
