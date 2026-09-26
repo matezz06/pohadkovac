@@ -6,6 +6,8 @@ export default function Header({ right }: { right?: React.ReactNode }) {
       <h1><Link href="/">📖 Pohádkovač</Link></h1>
       <div className="row">
         {right}
+        <Link className="btn" href="/order">Zákaznická objednávka</Link>
+        <Link className="btn" href="/admin">Náklady</Link>
         <Link className="btn" href="/settings">Nastavení</Link>
       </div>
     </header>

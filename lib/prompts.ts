@@ -162,3 +162,33 @@ export const LOCATIONS_SCHEMA = {
   },
   required: ["atmosphere", "locations", "pages"],
 };
+
+// ---------- 6) Zákaznická vlna úprav ----------
+export function characterRevisionPrompt(book: Book, c: Character, comment: string) {
+  return `The first attached image is a character reference illustration for a children's picture book (${c.name}, ${c.role}).
+Revise it according to the parent's request (written in Czech): "${comment}"
+Change ONLY what the request asks for. Keep the same illustration style (${stylePrompt(book.styleId, book.customStyle)}),
+pose, framing, plain light background and everything else. The other attached photos are the real-life likeness reference.
+No text in the image.`;
+}
+
+export function pageTextRevisionPrompt(book: Book, pageText: string, prev: string, next: string, comment: string) {
+  return `Uprav text jedné strany dětské pohádky podle připomínky rodiče.
+Předchozí strana: ${prev || "(žádná)"}
+TATO STRANA: ${pageText}
+Následující strana: ${next || "(žádná)"}
+Připomínka rodiče: ${comment}
+
+Vrať POUZE nový text této strany. Zachovej styl, délku (${TEXT_LENGTHS[book.textLength ?? "medium"].sentences}),
+jména postav a návaznost na okolní strany. Nic jiného nepiš.`;
+}
+
+export function pageImageEditPrompt(book: Book, chars: Character[], comment: string) {
+  const refs = chars.map((c, i) => `Reference image ${i + 2} = ${c.name}, ${c.role}.`).join("\n");
+  return `The first attached image is an illustration from a children's picture book.
+Edit it according to the parent's request (written in Czech): "${comment}"
+Change ONLY what the request asks for. Keep the composition, background, lighting, style and everything else as identical as possible.
+Characters must still match their reference images:
+${refs || "(none)"}
+No text, letters or captions in the image.`;
+}

@@ -33,6 +33,21 @@ Hodí se k ladění vzhledu a průběhu, nic se neplatí.
 Všechno jde upravit ručně: texty stran, scény, postavy na obrázku i popisy vzhledu. Každý obrázek se dá
 přegenerovat a mezi verzemi přepínat.
 
+## Zákaznický režim (pro třetí strany)
+
+- **/order**: objednávka s balíčkem (`lib/packages.ts`). Balíček pevně určuje počet stran, délku textu
+  a max. počet postav a cenu. Fotka u každé postavy a souhlas se zpracováním jsou povinné.
+- **/b/[id]**: průběh pro zákazníka. Server hlídá všechny limity:
+  1. **Postavičky**: jedno kolo připomínek ke kartám postav, pak schválení.
+  2. **Pohádka**: vygeneruje se celá. Následuje **jedna vlna úprav**: připomínky k textu nebo obrázku u libovolných stran,
+     odešlou se najednou. Obrázky se *upravují* podle připomínky, nekreslí se znovu.
+  3. **Hotovo**: knížka je uzamčená, zbývá čtení a PDF.
+- Generování běží na pozadí serveru a stránka průběžně ukazuje stav.
+- **/admin**: náklady na každou knížku v Kč a kontrola, že cena balíčku pokryje nejhorší případ.
+  Ceník API a kurz jsou v `lib/pricing.ts`. Jde o odhad, proto ho porovnej s vyúčtováním Google Cloud.
+
+Hlavní stránka `/` a `/books/[id]` jsou „studio“ pro provozovatele, kde je všechno povolené bez limitů.
+
 ## Kde ladit kvalitu
 
 | Soubor | Co v něm je |
@@ -51,8 +66,8 @@ Smazáním pohádky v aplikaci se smažou i její fotky.
 
 ## Co dál (směr veřejná aplikace)
 
-- přihlášení a úložiště (např. Supabase), nasazení na Vercel
+- přihlášení a úložiště (např. Supabase), nasazení na Vercel; studio a /admin jen pro provozovatele
 - platby (Stripe), pevná cena za knížku
 - GDPR: souhlas rodiče, automatické mazání fotek, zpracovatelská smlouva
-- fronta úloh místo generování přímo v požadavku
+- fronta úloh místo generování v procesu serveru (`lib/jobs.ts`)
 - tisk knížky přes tiskové API

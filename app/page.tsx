@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Header from "@/components/Header";
 import { listBooks } from "@/lib/store";
+import { costCzk } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function Home() {
           {books.map((b) => {
             const cover = b.pages.find((p) => p.n === 0)?.image;
             return (
-              <Link key={b.id} href={`/books/${b.id}`} className="card" style={{ textDecoration: "none", color: "inherit" }}>
+              <Link key={b.id} href={b.customer ? `/b/${b.id}` : `/books/${b.id}`} className="card" style={{ textDecoration: "none", color: "inherit" }}>
                 {cover ? (
                   <img className="thumb wide" src={`/api/files/${b.id}/${cover}`} alt="" />
                 ) : (
@@ -27,7 +28,8 @@ export default async function Home() {
                 )}
                 <strong style={{ display: "block", marginTop: 8 }}>{b.title ?? `Pohádka pro ${b.childName}`}</strong>
                 <span className="muted">
-                  {new Date(b.createdAt).toLocaleDateString("cs-CZ")} · {b.characters.length} postav · {b.pageCount} stran
+                  {b.customer && <span className="pill">zákazník · {b.status}</span>}{" "}
+                  {new Date(b.createdAt).toLocaleDateString("cs-CZ")} · {b.pageCount} stran · náklad ≈ {costCzk(b.usage).toFixed(1)} Kč
                 </span>
               </Link>
             );

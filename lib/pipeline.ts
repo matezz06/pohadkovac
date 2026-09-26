@@ -10,6 +10,9 @@ import {
   visualDescriptionPrompt,
   locationsPrompt,
   LOCATIONS_SCHEMA,
+  characterRevisionPrompt,
+  pageTextRevisionPrompt,
+  pageImageEditPrompt,
 } from "./prompts";
 import type { Book, Page, UsageEntry } from "./types";
 
@@ -203,4 +206,87 @@ export async function assignLocations(bookId: string) {
     }
     if (u) b.usage.push(usage("story", u));
   });
+}
+
+// ---------- zákaznická vlna úprav ----------
+
+export async function reviseCharacter(bookId: string, cid: string, comment: string) {
+  const book = await must(bookId);
+  const c = book.characters.find((x) => x.id === cid);
+  if (!c) throw new Error("Postava nenalezena");
+  if (!c.sheet) return generateSheet(bookId, cid);
+  const input: InputPart[] = [
+    { text: characterRevisionPrompt(book, c, comment) },
+    await img(bookId, c.sheet),
+    ...(await Promise.all(c.photos.map((p) => img(bookId, p)))),
+  ];
+  const r = await generateImage(input, { aspectRatio: "3:4", mockLabel: `${c.name} (upraveno)` });
+  const file = await storeGenerated(bookId, `sheet-${cid}`, r.image);
+  return updateBook(bookId, (b) => {
+    b.characters.find((x) => x.id === cid)!.sheet = file;
+    b.usage.push(usage("sheet", r.usage));
+  });
+}
+
+export async function revisePageText(bookId: string, n: number, comment: string) {
+  const book = await must(bookId);
+  const page = book.pages.find((p) => p.n === n);
+  if (!page) throw new Error("Strana nenalezena");
+  if (isMock()) {
+    return updateBook(bookId, (b) => {
+      b.pages.find((x) => x.n === n)!.text = `${page.text} (upraveno: ${comment})`;
+    });
+  }
+  const prev = book.pages.find((p) => p.n === n - 1 && p.n > 0)?.text ?? "";
+  const next = book.pages.find((p) => p.n === n + 1)?.text ?? "";
+  const r = await generateText([{ text: pageTextRevisionPrompt(book, page.text, prev, next, comment) }], { temperature: 0.6 });
+  return updateBook(bookId, (b) => {
+    b.pages.find((x) => x.n === n)!.text = r.text.trim().replace(/^["„]|["“]$/g, "");
+    b.usage.push(usage("story", r.usage));
+  });
+}
+
+export async function editPageImage(bookId: string, n: number, comment: string) {
+  const book = await must(bookId);
+  const page = book.pages.find((p) => p.n === n);
+  if (!page) throw new Error("Strana nenalezena");
+  if (!page.image) return generatePageImage(bookId, n);
+  const chars = page.characters
+    .map((id) => book.characters.find((c) => c.id === id))
+    .filter((c): c is NonNullable<typeof c> => !!c && !!c.sheet);
+  const input: InputPart[] = [
+    { text: pageImageEditPrompt(book, chars, comment) },
+    await img(bookId, page.image),
+    ...(await Promise.all(chars.map((c) => img(bookId, c.sheet!)))),
+  ];
+  const r = await generateImage(input, { aspectRatio: n === 0 ? "4:3" : "4:5", mockLabel: `strana ${n} (upraveno)` });
+  const file = await storeGenerated(bookId, `page-${n}`, r.image);
+  return updateBook(bookId, (b) => {
+    const p = b.pages.find((x) => x.n === n)!;
+    p.image = file;
+    p.imageVersions = [...(p.imageVersions ?? []), file];
+    b.usage.push(usage("page", r.usage));
+  });
+}
+
+/** Nakreslí zadané strany: stejné místo postupně (navazující pozadí), různá místa souběžně. */
+export async function drawPagesGrouped(bookId: string, ns: number[], onDone: () => Promise<void>) {
+  const book = await must(bookId);
+  const groups = new Map<string, number[]>();
+  for (const n of [...ns].sort((a, b) => a - b)) {
+    const loc = book.pages.find((p) => p.n === n)?.location;
+    const k = n > 0 && loc ? `loc:${loc}` : `page:${n}`;
+    groups.set(k, [...(groups.get(k) ?? []), n]);
+  }
+  const queue = [...groups.values()];
+  await Promise.all(
+    Array.from({ length: Math.min(2, queue.length) }, async () => {
+      while (queue.length) {
+        for (const n of queue.shift()!) {
+          await generatePageImage(bookId, n);
+          await onDone();
+        }
+      }
+    }),
+  );
 }

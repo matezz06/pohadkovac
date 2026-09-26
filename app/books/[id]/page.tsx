@@ -5,6 +5,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import type { Book, Page, TextLength } from "@/lib/types";
 import { TEXT_LENGTHS } from "@/lib/prompts";
+import { costCzk } from "@/lib/pricing";
 
 const f = (id: string, name?: string) => (name ? `/api/files/${id}/${name}` : undefined);
 
@@ -120,7 +121,7 @@ export default function BookPage({ params }: { params: Promise<{ id: string }> }
         style={{ fontFamily: "Georgia, serif", fontSize: 26, border: "none", background: "transparent", padding: 0 }}
       />
       <p className="muted">
-        Spotřeba: {images} obrázků · {tokIn.toLocaleString("cs-CZ")} vstupních / {tokOut.toLocaleString("cs-CZ")} výstupních tokenů
+        Spotřeba: {images} obrázků · {tokIn.toLocaleString("cs-CZ")} vstupních / {tokOut.toLocaleString("cs-CZ")} výstupních tokenů · náklad ≈ <strong>{costCzk(book.usage).toFixed(1)} Kč</strong>{book.customer && <> · <Link href={`/b/${id}`}>zákaznický pohled</Link></>}
       </p>
 
       <h2>1. Karty postav</h2>

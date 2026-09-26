@@ -17,7 +17,7 @@ export default async function Read({ params }: { params: Promise<{ id: string }>
   return (
     <main className="reader">
       <div className="toolbar no-print">
-        <Link className="btn" href={`/books/${id}`}>← Upravit</Link>
+        <Link className="btn" href={book.customer ? `/b/${id}` : `/books/${id}`}>← Zpět</Link>
         <PrintButton />
         <span className="muted">Tip: v dialogu tisku zvol „Uložit jako PDF“, orientace na šířku, bez okrajů.</span>
       </div>

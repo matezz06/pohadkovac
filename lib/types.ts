@@ -10,6 +10,8 @@ export type Character = {
   photos: string[];
   /** stylized reference image generated from photos */
   sheet?: string;
+  /** zákaznický režim: komentář ke kartě (lze jen jednou) */
+  comment?: string;
   /** short visual description written by the text model, reused in every scene prompt */
   visual?: string;
 };
@@ -23,6 +25,9 @@ export type Page = {
   location?: string;
   image?: string;
   imageVersions?: string[];
+  /** zákaznický režim: komentáře z vlny úprav */
+  textComment?: string;
+  imageComment?: string;
 };
 
 export type UsageEntry = {
@@ -37,6 +42,18 @@ export type UsageEntry = {
 export type Location = { id: string; name: string; description: string };
 
 export type TextLength = "short" | "medium" | "long";
+
+/** Zákaznický průběh: karty → (komentáře ke kartám) → knížka → (vlna úprav) → hotovo */
+export type BookStatus = "cards" | "book" | "final";
+
+export type Job = {
+  kind: "cards" | "book" | "cardsRevision" | "revision";
+  label: string;
+  done: number;
+  total: number;
+  startedAt: string;
+  error?: string;
+};
 
 export type Book = {
   id: string;
@@ -58,4 +75,12 @@ export type Book = {
   pages: Page[];
   coverImage?: string;
   usage: UsageEntry[];
+  /** zákaznický režim */
+  customer?: boolean;
+  packageId?: string;
+  priceCzk?: number;
+  status?: BookStatus;
+  cardsRevisionUsed?: boolean;
+  revisionUsed?: boolean;
+  job?: Job | null;
 };
