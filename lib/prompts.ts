@@ -162,11 +162,16 @@ Wide establishing view with open space in the foreground where characters can la
 /** Kontrola hotového obrázku: nikdo zdvojený, nikdo navíc. */
 export function imageCheckPrompt(chars: Character[]) {
   const list = chars.length ? chars.map((c) => `${c.name} (${c.role}${c.outfit ? `; wears: ${c.outfit}` : ""})`).join(", ") : "nobody";
-  return `Check this children's book illustration. Expected main figures, each exactly once: ${list}.
+  const cards = chars.length
+    ? `The FIRST image is the illustration to check. The following images are the official character cards, in this order: ${chars.map((c) => c.name).join(", ")}.`
+    : "The image is the illustration to check.";
+  return `Check this children's book illustration. ${cards}
+Expected main figures, each exactly once: ${list}.
 Count every person and every animal visible (ignore tiny birds/insects in the background).
 Answer as JSON: {"ok": boolean, "problem": string}. ok=false if any expected figure appears more than once,
 if there is an extra person or extra dog/cat, if an expected figure is missing,
-or if someone wears clearly different clothing (other colour or garment) than listed. "problem" = short English description, empty if ok.`;
+or if someone looks clearly different from their card: other hair/fur colour or length, other clothing colour or garment.
+Small differences in pose, expression or drawing detail are fine. "problem" = short English description of what to fix, empty if ok.`;
 }
 
 export const IMAGE_CHECK_SCHEMA = {

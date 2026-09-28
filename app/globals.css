@@ -69,3 +69,4 @@ button.small { padding: 3px 10px; font-size: 13px; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .tbl th, .tbl td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .tbl th { color: var(--muted); font-weight: 600; }
+@media print { .mock-banner { display: none !important; } }

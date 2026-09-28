@@ -189,11 +189,11 @@ async function ensureLocationPlate(bookId: string, locId: string): Promise<strin
 }
 
 /** Levná kontrola textovým modelem: je každá postava na obrázku právě jednou? */
-async function checkImage(bookId: string, image: Buffer, mime: string, chars: Book["characters"]) {
+async function checkImage(bookId: string, image: Buffer, mime: string, chars: Book["characters"], refs: InputPart[]) {
   if (isMock()) return { ok: true, problem: "" };
   try {
     const r = await generateText(
-      [{ text: imageCheckPrompt(chars) }, { image, mime }],
+      [{ text: imageCheckPrompt(chars) }, { image, mime }, ...refs],
       { schema: IMAGE_CHECK_SCHEMA, temperature: 0 },
     );
     await updateBook(bookId, (b) => {
@@ -236,7 +236,7 @@ export async function generatePageImage(bookId: string, n: number) {
   let r = await draw();
   const used = [r.usage];
   // Kontrola zdvojených / přebývajících postav – při chybě jeden automatický pokus navíc.
-  const check = await checkImage(bookId, r.image, r.mime, chars);
+  const check = await checkImage(bookId, r.image, r.mime, chars, refs);
   if (!check.ok) {
     console.warn(`Strana ${n}: ${check.problem} – kreslím znovu`);
     r = await draw(`IMPORTANT – a previous attempt was rejected because: ${check.problem}. Make sure this does not happen again.`);

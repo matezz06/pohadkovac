@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { loadBook } from "@/lib/store";
 import PrintButton from "./PrintButton";
+import { BRAND } from "@/lib/brand";
 import "./read.css";
 
 export const dynamic = "force-dynamic";
@@ -34,9 +35,27 @@ export default async function Read({ params }: { params: Promise<{ id: string }>
         </section>
       ))}
 
+      {/* Tiráž: stejná ilustrace jako obálka (poloprůhledná), postavy a údaje o výrobci – žádný další obrázek se negeneruje */}
       <section className="sheet end">
-        <p>Konec</p>
-        <p className="muted">♥ {book.childName}</p>
+        {cover?.image && <img className="end-bg" src={src(cover.image)} alt="" />}
+        <div className="end-body">
+          <p className="end-title">Konec</p>
+          <p className="end-sub">{book.title}</p>
+          <div className="cast">
+            {book.characters.map((c) => (
+              <figure key={c.id}>
+                {c.sheet ? <img src={src(c.sheet)} alt={c.name} /> : <div className="avatar-empty" />}
+                <figcaption>{c.name}</figcaption>
+              </figure>
+            ))}
+          </div>
+          <div className="imprint">
+            <p><strong>{BRAND.name}©</strong> · {BRAND.web}</p>
+            <p>{BRAND.disclaimer}</p>
+            <p>Více informací v obchodních podmínkách: {BRAND.termsUrl}</p>
+            <p>© {new Date(book.createdAt).getFullYear()} {BRAND.name}</p>
+          </div>
+        </div>
       </section>
     </main>
   );
