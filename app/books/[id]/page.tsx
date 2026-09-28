@@ -143,6 +143,15 @@ export default function BookPage({ params }: { params: Promise<{ id: string }> }
                 onBlur={(e) => e.target.value !== (c.visual ?? "") && patch({ character: { id: c.id, visual: e.target.value } })}
               />
             </label>
+            <label>Oblečení – musí být na všech stranách stejné (anglicky)
+              <textarea
+                defaultValue={c.outfit ?? ""}
+                key={`o-${c.outfit}`}
+                rows={2}
+                placeholder="vyplní se automaticky podle karty"
+                onBlur={(e) => e.target.value !== (c.outfit ?? "") && patch({ character: { id: c.id, outfit: e.target.value } })}
+              />
+            </label>
             <div className="row">
               <button className="small" disabled={busy[`sheet-${c.id}`]} onClick={() => act(`sheet-${c.id}`, { action: "sheet", cid: c.id })}>
                 {c.sheet ? "↻ Nová karta" : "Nakreslit kartu"}
@@ -200,10 +209,14 @@ export default function BookPage({ params }: { params: Promise<{ id: string }> }
               <input defaultValue={book.atmosphere ?? ""} key={book.atmosphere} onBlur={(e) => e.target.value !== (book.atmosphere ?? "") && patch({ atmosphere: e.target.value })} />
             </label>
             {book.locations!.map((l, i) => (
-              <label key={l.id}>{l.name} (anglicky)
+              <div key={l.id} className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap" }}>
+              {l.plate ? <img src={f(id, l.plate)} alt="" title="Prázdné pozadí místa" style={{ width: 72, height: 90, objectFit: "cover", borderRadius: 8 }} />
+                : <div className="placeholder" title="Pozadí vznikne s první stranou" style={{ width: 72, height: 90, borderRadius: 8, background: "var(--soft)", fontSize: 11 }}>bez pozadí</div>}
+              <label style={{ flex: 1 }}>{l.name} (anglicky)
                 <textarea defaultValue={l.description} key={l.description} rows={2}
                   onBlur={(e) => e.target.value !== l.description && patch({ locations: book.locations!.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)) })} />
               </label>
+              </div>
             ))}
           </div>
         </details>

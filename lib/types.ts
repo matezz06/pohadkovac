@@ -14,6 +14,8 @@ export type Character = {
   comment?: string;
   /** short visual description written by the text model, reused in every scene prompt */
   visual?: string;
+  /** přesný popis oblečení/obojku podle KARTY postavy – na všech stranách musí být stejné */
+  outfit?: string;
 };
 
 export type Page = {
@@ -39,7 +41,13 @@ export type UsageEntry = {
   images: number;
 };
 
-export type Location = { id: string; name: string; description: string };
+export type Location = {
+  id: string;
+  name: string;
+  description: string;
+  /** prázdné pozadí místa (bez postav) – předloha prostředí pro všechny strany z tohoto místa */
+  plate?: string;
+};
 
 export type TextLength = "short" | "medium" | "long";
 

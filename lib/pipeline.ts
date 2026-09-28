@@ -13,6 +13,10 @@ import {
   characterRevisionPrompt,
   pageTextRevisionPrompt,
   pageImageEditPrompt,
+  locationPlatePrompt,
+  imageCheckPrompt,
+  IMAGE_CHECK_SCHEMA,
+  outfitPrompt,
 } from "./prompts";
 import type { Book, Page, UsageEntry } from "./types";
 
@@ -78,10 +82,38 @@ export async function generateSheet(bookId: string, cid: string) {
   ];
   const r = await generateImage(input, { aspectRatio: "3:4", mockLabel: c.name });
   const file = await storeGenerated(bookId, `sheet-${cid}`, r.image);
-  return updateBook(bookId, (b) => {
-    b.characters.find((x) => x.id === cid)!.sheet = file;
+  await updateBook(bookId, (b) => {
+    const t = b.characters.find((x) => x.id === cid)!;
+    t.sheet = file;
+    t.outfit = undefined;
     b.usage.push(usage("sheet", r.usage));
   });
+  return describeOutfit(bookId, cid);
+}
+
+/** Přesný popis oblečení podle karty postavy – drží stejné oblečení na všech stranách. */
+export async function describeOutfit(bookId: string, cid: string) {
+  const book = await must(bookId);
+  const c = book.characters.find((x) => x.id === cid);
+  if (!c?.sheet) return book;
+  if (isMock()) {
+    return updateBook(bookId, (b) => {
+      b.characters.find((x) => x.id === cid)!.outfit = "(mock) same outfit as on the card";
+    });
+  }
+  const r = await generateText([{ text: outfitPrompt(c) }, await img(bookId, c.sheet)], { temperature: 0.2 });
+  return updateBook(bookId, (b) => {
+    b.characters.find((x) => x.id === cid)!.outfit = r.text.trim();
+    b.usage.push(usage("visual", r.usage));
+  });
+}
+
+async function ensureOutfits(bookId: string, ids: string[]) {
+  const book = await must(bookId);
+  for (const c of book.characters) {
+    if (ids.includes(c.id) && c.sheet && !c.outfit) await describeOutfit(bookId, c.id);
+  }
+  return must(bookId);
 }
 
 type StoryJson = {
@@ -132,7 +164,7 @@ export async function generateStory(bookId: string) {
   return updateBook(bookId, (b) => {
     b.title = story.title;
     b.atmosphere = story.atmosphere;
-    b.locations = story.locations ?? [];
+    b.locations = (story.locations ?? []).map((l) => ({ ...l, plate: undefined }));
     const locIds = new Set(b.locations.map((l) => l.id));
     const cover: Page = { n: 0, text: story.title, scene: story.coverScene, characters: clean(story.coverCharacters) };
     b.pages = [cover, ...story.pages.map((p, i) => ({ n: i + 1, text: p.text, scene: p.scene, characters: clean(p.characters), location: p.location && locIds.has(p.location) ? p.location : undefined }))];
@@ -140,8 +172,42 @@ export async function generateStory(bookId: string) {
   });
 }
 
-export async function generatePageImage(bookId: string, n: number) {
+/** Prázdné pozadí místa (bez postav). Vzniká jednou a slouží jako předloha pro všechny strany z toho místa. */
+async function ensureLocationPlate(bookId: string, locId: string): Promise<string | undefined> {
   const book = await must(bookId);
+  const loc = book.locations?.find((l) => l.id === locId);
+  if (!loc) return undefined;
+  if (loc.plate && (isMock() || !loc.plate.startsWith("mock-"))) return loc.plate;
+  const r = await generateImage([{ text: locationPlatePrompt(book, loc) }], { aspectRatio: "4:5", mockLabel: `pozadí: ${loc.name}` });
+  const file = await storeGenerated(bookId, `plate-${locId}`, r.image);
+  await updateBook(bookId, (b) => {
+    const l = b.locations?.find((x) => x.id === locId);
+    if (l) l.plate = file;
+    b.usage.push(usage("page", r.usage));
+  });
+  return file;
+}
+
+/** Levná kontrola textovým modelem: je každá postava na obrázku právě jednou? */
+async function checkImage(bookId: string, image: Buffer, mime: string, chars: Book["characters"]) {
+  if (isMock()) return { ok: true, problem: "" };
+  try {
+    const r = await generateText(
+      [{ text: imageCheckPrompt(chars) }, { image, mime }],
+      { schema: IMAGE_CHECK_SCHEMA, temperature: 0 },
+    );
+    await updateBook(bookId, (b) => {
+      b.usage.push(usage("visual", r.usage));
+    });
+    return JSON.parse(r.text) as { ok: boolean; problem: string };
+  } catch {
+    return { ok: true, problem: "" }; // kontrola je jen pojistka – když selže, obrázek nezahazujeme
+  }
+}
+
+export async function generatePageImage(bookId: string, n: number) {
+  const page0 = (await must(bookId)).pages.find((p) => p.n === n);
+  const book = await ensureOutfits(bookId, page0?.characters ?? []);
   const page = book.pages.find((p) => p.n === n);
   if (!page) throw new Error("Strana nenalezena");
   const chars = page.characters
@@ -152,27 +218,36 @@ export async function generatePageImage(bookId: string, n: number) {
     if (c.sheet) refs.push(await img(bookId, c.sheet));
     else if (c.photos[0]) refs.push(await img(bookId, c.photos[0]));
   }
-  // Pozadí: předchozí nakreslená strana ze stejného místa slouží jako předloha prostředí.
+  // Pozadí: prázdná předloha místa (bez postav) – drží stejné prostředí a nesvádí ke zdvojení postav.
   const location = book.locations?.find((l) => l.id === page.location);
-  let envRef: InputPart | null = null;
-  if (n > 0 && page.location) {
-    const prev = book.pages
-      .filter((p) => p.n > 0 && p.n < n && p.location === page.location && p.image && (isMock() || !p.image.startsWith("mock-")))
-      .sort((a, b) => b.n - a.n)[0];
-    if (prev?.image) envRef = await img(bookId, prev.image);
+  const plate = n > 0 && location ? await ensureLocationPlate(bookId, location.id) : undefined;
+  const plateRef = plate ? await img(bookId, plate) : null;
+
+  const draw = (warning = "") =>
+    generateImage(
+      [
+        { text: pageImagePrompt(book, page.scene, chars, n === 0, location, !!plateRef, warning) },
+        ...refs,
+        ...(plateRef ? [plateRef] : []),
+      ],
+      { aspectRatio: n === 0 ? "4:3" : "4:5", mockLabel: n === 0 ? "obálka" : `strana ${n}` },
+    );
+
+  let r = await draw();
+  const used = [r.usage];
+  // Kontrola zdvojených / přebývajících postav – při chybě jeden automatický pokus navíc.
+  const check = await checkImage(bookId, r.image, r.mime, chars);
+  if (!check.ok) {
+    console.warn(`Strana ${n}: ${check.problem} – kreslím znovu`);
+    r = await draw(`IMPORTANT – a previous attempt was rejected because: ${check.problem}. Make sure this does not happen again.`);
+    used.push(r.usage);
   }
-  const input: InputPart[] = [
-    { text: pageImagePrompt(book, page.scene, chars, n === 0, location, !!envRef) },
-    ...refs,
-    ...(envRef ? [envRef] : []),
-  ];
-  const r = await generateImage(input, { aspectRatio: n === 0 ? "4:3" : "4:5", mockLabel: n === 0 ? "obálka" : `strana ${n}` });
   const file = await storeGenerated(bookId, `page-${n}`, r.image);
   return updateBook(bookId, (b) => {
     const p = b.pages.find((x) => x.n === n)!;
     p.image = file;
     p.imageVersions = [...(p.imageVersions ?? []), file];
-    b.usage.push(usage("page", r.usage));
+    for (const u of used) b.usage.push(usage("page", u));
   });
 }
 
@@ -196,7 +271,7 @@ export async function assignLocations(bookId: string) {
   }
   return updateBook(bookId, (b) => {
     b.atmosphere = res.atmosphere;
-    b.locations = res.locations;
+    b.locations = res.locations.map((l) => ({ ...l, plate: undefined }));
     const ids = new Set(res.locations.map((l) => l.id));
     for (const x of res.pages) {
       const p = b.pages.find((q) => q.n === x.n);
@@ -222,10 +297,13 @@ export async function reviseCharacter(bookId: string, cid: string, comment: stri
   ];
   const r = await generateImage(input, { aspectRatio: "3:4", mockLabel: `${c.name} (upraveno)` });
   const file = await storeGenerated(bookId, `sheet-${cid}`, r.image);
-  return updateBook(bookId, (b) => {
-    b.characters.find((x) => x.id === cid)!.sheet = file;
+  await updateBook(bookId, (b) => {
+    const t = b.characters.find((x) => x.id === cid)!;
+    t.sheet = file;
+    t.outfit = undefined;
     b.usage.push(usage("sheet", r.usage));
   });
+  return describeOutfit(bookId, cid);
 }
 
 export async function revisePageText(bookId: string, n: number, comment: string) {
@@ -247,7 +325,8 @@ export async function revisePageText(bookId: string, n: number, comment: string)
 }
 
 export async function editPageImage(bookId: string, n: number, comment: string) {
-  const book = await must(bookId);
+  const page0 = (await must(bookId)).pages.find((p) => p.n === n);
+  const book = await ensureOutfits(bookId, page0?.characters ?? []);
   const page = book.pages.find((p) => p.n === n);
   if (!page) throw new Error("Strana nenalezena");
   if (!page.image) return generatePageImage(bookId, n);

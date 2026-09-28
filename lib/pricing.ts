@@ -44,7 +44,8 @@ export function costCzk(usage: UsageEntry[]) {
  */
 export function maxCostCzk(pkg: Package, imageModel = "gemini-3.1-flash-image") {
   const img = priceOf(imageModel).perImage;
-  const images = pkg.maxCharacters * 2 + (pkg.pages + 1) * 2;
-  const textUsd = 0.05; // popisy, příběh, přepisy textů – řádově centy
+  // karty 2×, strany 2× (vlna úprav), pozadí míst (max 4), rezerva 25 % na automatické překreslení po kontrole
+  const images = pkg.maxCharacters * 2 + (pkg.pages + 1) * 2 + 4 + Math.ceil((pkg.pages + 1) * 0.25);
+  const textUsd = 0.08; // popisy, příběh, přepisy textů – řádově centy
   return (images * img + textUsd) * USD_CZK;
 }

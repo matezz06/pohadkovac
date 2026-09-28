@@ -12,7 +12,15 @@ Look at the attached photo(s) of "${c.name}" (${c.role}). Notes from the parent:
 
 Write ONE compact English paragraph (max 60 words) describing only the stable visual features an illustrator needs
 to keep the character recognizable: species/breed (for animals), approximate age, body build, hair/fur colour and style,
-facial hair, glasses, distinctive marks, typical clothing colours. No names, no personality, no background.`;
+facial hair, glasses, distinctive marks. Do NOT describe clothing (it is defined separately). No names, no personality, no background.`;
+}
+
+// ---------- 1b) Oblečení podle karty postavy ----------
+export function outfitPrompt(c: Character) {
+  return `The attached image is the official character reference of "${c.name}" (${c.role}) for a picture book.
+Describe EXACTLY what the character wears so an illustrator can repeat it identically on every page:
+each garment/accessory with its colour and pattern (e.g. "white t-shirt with small rainbow prints, orange shorts,
+pink socks, white sneakers"; for animals collar colour or "no collar"). One line, English, max 40 words, clothing only.`;
 }
 
 // ---------- 2) Karta postavy (stylizovaná předloha) ----------
@@ -54,7 +62,7 @@ Požadavky:
 - Hlavní hrdina je aktivní – on/ona řeší situaci. Každá vedlejší postava má aspoň jednu stranu, kde je důležitá, a projevuje se podle popisu.
 - Opakující se refrén (stejná věta) aspoň na 3 stranách.
 - Pro každou stranu napiš "scene" = ANGLICKY popis ilustrace pro ilustrátora: kdo je na obrázku, co přesně dělá, kde, výraz tváře, denní doba.
-  Nepopisuj vzhled postav (ten ilustrátor zná), jen akci a prostředí. Jedna jasná scéna, žádný text v obrázku.
+  Nepopisuj vzhled ani OBLEČENÍ postav (ten ilustrátor zná a musí zůstat všude stejný), jen akci a prostředí. Jedna jasná scéna, žádný text v obrázku.
 - "characters" = seznam id postav, které jsou na ilustraci vidět (max 4).
 - PROSTŘEDÍ: děj se odehrává v MÁLO místech (1–3, max 4). Každé místo popiš v "locations" (id, krátký český název,
   a ANGLICKY podrobný stálý popis: typ krajiny, konkrétní výrazné prvky – stromy, cesta, plot, rybník…, barvy).
@@ -98,21 +106,30 @@ export const STORY_SCHEMA = {
 };
 
 // ---------- 4) Ilustrace strany ----------
+/** Kdo je na obrázku – s počty podle druhu, aby model nikoho nezdvojil. */
+function castLine(chars: Character[]) {
+  if (!chars.length) return "NO main characters in this image – only the environment (at most tiny unnamed background animals).";
+  const names = chars.map((c) => `${c.name} (${c.role})`).join(", ");
+  return `The image contains EXACTLY ${chars.length} main figure${chars.length > 1 ? "s" : ""}: ${names}.
+Each of them appears EXACTLY ONCE. Never draw the same character twice (no duplicates, no mirrored copies, no "before/after" versions).
+Do not add any other people or animals – count them before finishing.`;
+}
+
 export function pageImagePrompt(
   book: Book,
   scene: string,
   chars: Character[],
   isCover: boolean,
   location?: Location,
-  hasEnvRef = false,
+  hasPlate = false,
+  extraWarning = "",
 ) {
   const refs = chars
-    .map((c, i) => `Reference image ${i + 1} = ${c.name}, ${c.role}. ${c.visual ?? ""}`)
+    .map((c, i) => `Reference image ${i + 1} = ${c.name}, ${c.role}. ${c.visual ?? ""}${c.outfit ? `\n   Wears EXACTLY (same on every page, never change; ignore any other clothing mentioned above): ${c.outfit}` : ""}`)
     .join("\n");
-  const env = hasEnvRef
-    ? `Reference image ${chars.length + 1} = the PREVIOUS PAGE of this book, set in the same place. Keep the SAME environment:
-same landscape, background elements, their layout and colours, same lighting and time of day. Only the characters' action,
-poses and a slightly different camera angle may change. Do not copy the characters from it – use their own reference images.`
+  const env = hasPlate
+    ? `Reference image ${chars.length + 1} = the EMPTY BACKGROUND of this place (no characters). Use it as the setting:
+keep the same landscape, background elements, their layout, colours and lighting. The camera angle may shift slightly.`
     : "";
   return `Illustrate one page of a children's picture book for a ${book.childAge}-year-old.
 Style: ${stylePrompt(book.styleId, book.customStyle)}.
@@ -121,13 +138,42 @@ ${book.atmosphere ? `Atmosphere (same for the whole book): ${book.atmosphere}.` 
 ${location ? `Setting – ${location.name}: ${location.description}` : ""}
 Scene: ${scene}
 
-Characters in this scene – draw them so they look exactly like their reference images (same colours, proportions, clothing, markings):
-${refs || "(no main characters)"}
+Character references – draw each so they look exactly like their reference image (same colours, proportions, clothing, markings):
+${refs || "(none)"}
 ${env}
 
+${castLine(chars)}
+Clothing, colours and accessories of every character must be IDENTICAL to their reference image – no outfit changes.
+${extraWarning}
+
 Rules: consistent style with the references, warm and safe mood, clear composition readable by a small child,
-no text, letters or captions anywhere in the image, no extra limbs, only the listed characters as main figures.`;
+no text, letters or captions anywhere in the image, no extra limbs.`;
 }
+
+/** Prázdné pozadí místa – jednou na místo, pak předloha pro všechny jeho strany. */
+export function locationPlatePrompt(book: Book, location: Location) {
+  return `Paint an EMPTY background for a children's picture book – no people, no animals, no characters at all.
+Style: ${stylePrompt(book.styleId, book.customStyle)}.
+${book.atmosphere ? `Atmosphere: ${book.atmosphere}.` : ""}
+Place – ${location.name}: ${location.description}
+Wide establishing view with open space in the foreground where characters can later stand. No text.`;
+}
+
+/** Kontrola hotového obrázku: nikdo zdvojený, nikdo navíc. */
+export function imageCheckPrompt(chars: Character[]) {
+  const list = chars.length ? chars.map((c) => `${c.name} (${c.role}${c.outfit ? `; wears: ${c.outfit}` : ""})`).join(", ") : "nobody";
+  return `Check this children's book illustration. Expected main figures, each exactly once: ${list}.
+Count every person and every animal visible (ignore tiny birds/insects in the background).
+Answer as JSON: {"ok": boolean, "problem": string}. ok=false if any expected figure appears more than once,
+if there is an extra person or extra dog/cat, if an expected figure is missing,
+or if someone wears clearly different clothing (other colour or garment) than listed. "problem" = short English description, empty if ok.`;
+}
+
+export const IMAGE_CHECK_SCHEMA = {
+  type: "OBJECT",
+  properties: { ok: { type: "BOOLEAN" }, problem: { type: "STRING" } },
+  required: ["ok", "problem"],
+};
 
 // ---------- 5) Doplnění míst k hotovému příběhu (texty zůstanou) ----------
 export function locationsPrompt(book: Book) {
@@ -184,11 +230,12 @@ jména postav a návaznost na okolní strany. Nic jiného nepiš.`;
 }
 
 export function pageImageEditPrompt(book: Book, chars: Character[], comment: string) {
-  const refs = chars.map((c, i) => `Reference image ${i + 2} = ${c.name}, ${c.role}.`).join("\n");
+  const refs = chars.map((c, i) => `Reference image ${i + 2} = ${c.name}, ${c.role}.${c.outfit ? ` Wears exactly: ${c.outfit}` : ""}`).join("\n");
   return `The first attached image is an illustration from a children's picture book.
 Edit it according to the parent's request (written in Czech): "${comment}"
 Change ONLY what the request asks for. Keep the composition, background, lighting, style and everything else as identical as possible.
 Characters must still match their reference images:
 ${refs || "(none)"}
+Each character appears EXACTLY ONCE – never duplicate anyone, never add extra people or animals.
 No text, letters or captions in the image.`;
 }

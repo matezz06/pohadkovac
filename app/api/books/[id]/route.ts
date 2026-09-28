@@ -15,7 +15,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params;
   const patch = (await req.json()) as Partial<Book> & {
     page?: { n: number; text?: string; scene?: string; characters?: string[]; image?: string; location?: string };
-    character?: { id: string; visual?: string; description?: string; name?: string; role?: string; sheet?: string };
+    character?: { id: string; visual?: string; outfit?: string; description?: string; name?: string; role?: string; sheet?: string };
   };
   const book = await updateBook(id, (b) => {
     if (patch.title !== undefined) b.title = patch.title;
@@ -26,7 +26,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (patch.pageCount !== undefined) b.pageCount = Math.min(20, Math.max(3, Number(patch.pageCount)));
     if (patch.textLength !== undefined) b.textLength = patch.textLength;
     if (patch.atmosphere !== undefined) b.atmosphere = patch.atmosphere;
-    if (patch.locations !== undefined) b.locations = patch.locations;
+    if (patch.locations !== undefined) {
+      // změněný popis místa → staré prázdné pozadí zahodit, vznikne nové
+      b.locations = patch.locations.map((l) => {
+        const old = b.locations?.find((x) => x.id === l.id);
+        return old && old.description === l.description ? { ...l, plate: old.plate } : { ...l, plate: undefined };
+      });
+    }
     if (patch.page) {
       const p = b.pages.find((x) => x.n === patch.page!.n);
       if (p) {
