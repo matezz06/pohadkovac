@@ -1,4 +1,4 @@
-# 📖 Pohádkovač
+# ✨ Čarovná dílna (projekt Pohádkovač)
 
 Personalizované pohádky pro děti: dítě je hlavní hrdina a postavy (strejda, psi, babička…) se kreslí podle fotek.
 Text i ilustrace generuje Google Gemini, stačí jeden API klíč.

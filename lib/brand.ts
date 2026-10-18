@@ -1,11 +1,11 @@
 /**
  * ZNAČKA – údaje na poslední stránce knížky (tiráž).
- * Zatím pracovní; před spuštěním ověř dostupnost názvu/domény a ochranné známky.
+ * Značka Čarovná dílna; před spuštěním ověř volnost domény carovnadilna.cz a ochrannou známku (ÚPV).
  */
 export const BRAND = {
-  name: "Pohádkář",
-  web: "www.pohadkar.cz",
-  termsUrl: "www.pohadkar.cz/obchodni-podminky",
+  name: "Čarovná dílna",
+  web: "www.carovnadilna.cz",
+  termsUrl: "www.carovnadilna.cz/obchodni-podminky",
   disclaimer:
     "Příběh i ilustrace této knížky vytvořila generativní umělá inteligence podle fotografií a zadání objednatele. " +
     "Postavy jsou volně inspirované skutečnými osobami a zvířaty, podoba se může lišit.",

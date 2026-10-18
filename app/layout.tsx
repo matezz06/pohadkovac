@@ -2,7 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { isMock } from "@/lib/gemini";
 
-export const metadata: Metadata = { title: "Pohádkovač", description: "Personalizované pohádky s ilustracemi" };
+export const metadata: Metadata = { title: "Čarovná dílna", description: "Pohádky a další tvoření, kde je hrdinou vaše rodina" };
 
 export const dynamic = "force-dynamic";
 
