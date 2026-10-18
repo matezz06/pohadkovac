@@ -3,7 +3,9 @@ import path from "path";
 import crypto from "crypto";
 import type { Book } from "./types";
 
-export const DATA_DIR = path.join(process.cwd(), "data");
+// Kam se ukládají pohádky, fotky a ilustrace. Nastav DATA_DIR v .env.local na složku v Google Drive,
+// ať data nejsou jen v jednom počítači. Bez nastavení se použije složka "data" v projektu.
+export const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(process.cwd(), "data");
 export const BOOKS_DIR = path.join(DATA_DIR, "books");
 
 export function newId() {

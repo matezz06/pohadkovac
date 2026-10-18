@@ -61,7 +61,8 @@ Modely se dají přepnout v aplikaci v **Nastavení**, kde je i seznam modelů d
 
 ## Data
 
-Vše se ukládá lokálně do složky `data/` (je v `.gitignore`): fotky, vygenerované obrázky a `book.json`.
+Vše se ukládá do složky nastavené v `DATA_DIR` (`.env.local`), doporučeně do Google Drive, aby data nebyla jen v jednom počítači.
+Bez nastavení se použije složka `data/` v projektu (je v `.gitignore`). Ukládají se fotky, vygenerované obrázky a `book.json`.
 Smazáním pohádky v aplikaci se smažou i její fotky.
 
 ## Co dál (směr veřejná aplikace)
