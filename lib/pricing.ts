@@ -49,3 +49,56 @@ export function maxCostCzk(pkg: Package, imageModel = "gemini-3.1-flash-image") 
   const textUsd = 0.08; // popisy, příběh, přepisy textů – řádově centy
   return (images * img + textUsd) * USD_CZK;
 }
+
+// ---------- Odhad pro rodiče (průběžně na obrazovce) ----------
+const DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image";
+/** Průměrně ~30 % obrázků se po AI kontrole kreslí znovu. */
+const REDRAW = 1.3;
+/** Texty: příběh, popisy postav, kontroly, překlady – v USD na celou knížku. */
+const TEXT_USD = 0.06;
+
+/** Cena jednoho obrázku v Kč (včetně průměrného překreslení po kontrole). */
+export function imageCzk(model = DEFAULT_IMAGE_MODEL) {
+  return priceOf(model).perImage * REDRAW * USD_CZK;
+}
+
+/** Kolik pozadí (míst) čekat podle volby počtu míst. */
+export function platesFor(placeCount?: string) {
+  return placeCount === "1" ? 1 : placeCount === "4-5" ? 5 : 3;
+}
+
+/** Víc míst = víc ladění prostředí a překreslování stran – rezerva na opravy. */
+function pagesFactor(placeCount?: string) {
+  return placeCount === "4-5" ? 1.15 : placeCount === "1" ? 0.95 : 1;
+}
+
+/** První odhad z formuláře: počet postav, stran a míst. */
+export function estimateCzk(characters: number, pages: number, placeCount?: string, model = DEFAULT_IMAGE_MODEL) {
+  const images = characters + platesFor(placeCount) + (pages + 1) * pagesFactor(placeCount);
+  return images * imageCzk(model) + TEXT_USD * USD_CZK;
+}
+
+type BookLike = {
+  characters: { sheet?: string }[];
+  pages: { n: number; image?: string; stale?: boolean }[];
+  pageCount: number;
+  placeCount?: string;
+  locations?: { plate?: string }[];
+};
+
+/** Kolik ještě zbývá utratit do hotové knížky (chybějící karty, pozadí, strany a zastaralé strany). */
+export function remainingCzk(b: BookLike, isMissing: (f?: string) => boolean = (f) => !f) {
+  const one = imageCzk();
+  let images = b.characters.filter((c) => isMissing(c.sheet)).length;
+  let text = 0;
+  if (!b.pages.length) {
+    images += (b.pageCount + 1) * pagesFactor(b.placeCount) + platesFor(b.placeCount);
+    text = TEXT_USD * USD_CZK;
+  } else {
+    images += (b.locations ?? []).filter((l) => isMissing(l.plate)).length;
+    images += b.pages.filter((p) => isMissing(p.image) || p.stale).length;
+  }
+  return images * one + text;
+}
+
+export const formatCzk = (v: number) => `${v < 10 ? v.toFixed(1).replace(".", ",") : Math.round(v)} Kč`;

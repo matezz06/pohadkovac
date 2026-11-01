@@ -37,6 +37,8 @@ export async function POST(req: Request) {
     customStyle: String(fd.get("customStyle") ?? "") || undefined,
     theme: String(fd.get("theme") ?? ""),
     lesson: String(fd.get("lesson") ?? "") || undefined,
+    places: String(fd.get("places") ?? "").trim() || undefined,
+    placeCount: (["1", "2-3", "4-5"].includes(String(fd.get("placeCount"))) ? String(fd.get("placeCount")) : undefined) as Book["placeCount"],
     pageCount: Math.min(20, Math.max(3, Number(fd.get("pageCount") ?? 10))),
     textLength: (["short", "medium", "long"].includes(String(fd.get("textLength"))) ? String(fd.get("textLength")) : "medium") as Book["textLength"],
     language: "cs",

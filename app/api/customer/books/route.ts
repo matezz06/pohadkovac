@@ -40,6 +40,8 @@ export async function POST(req: Request) {
     styleId: String(fd.get("styleId") ?? "watercolor"),
     theme: String(fd.get("theme") ?? "").slice(0, 1000),
     lesson: String(fd.get("lesson") ?? "").slice(0, 300) || undefined,
+    places: String(fd.get("places") ?? "").slice(0, 500).trim() || undefined,
+    placeCount: (["1", "2-3", "4-5"].includes(String(fd.get("placeCount"))) ? String(fd.get("placeCount")) : undefined) as Book["placeCount"],
     pageCount: pkg.pages,
     textLength: pkg.textLength,
     language: "cs",

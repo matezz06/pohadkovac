@@ -30,6 +30,12 @@ export type Page = {
   /** zákaznický režim: komentáře z vlny úprav */
   textComment?: string;
   imageComment?: string;
+  /** ilustrace neodpovídá aktuálním předlohám (změnila se karta, pozadí, scéna…) – je potřeba překreslit */
+  stale?: boolean;
+  /** co našla AI kontrola obrázku (česky) – prázdné = v pořádku */
+  issue?: string;
+  /** kdy proběhla poslední AI kontrola */
+  checkedAt?: string;
 };
 
 export type UsageEntry = {
@@ -48,6 +54,8 @@ export type Location = {
   /** prázdné pozadí místa (bez postav) – předloha prostředí pro všechny strany z tohoto místa */
   plate?: string;
 };
+
+export type PlaceCount = "1" | "2-3" | "4-5";
 
 export type TextLength = "short" | "medium" | "long";
 
@@ -72,6 +80,10 @@ export type Book = {
   customStyle?: string;
   theme: string;
   lesson?: string;
+  /** kde se má pohádka odehrávat – přání rodiče (česky), příběh a prostředí z něj vycházejí */
+  places?: string;
+  /** kolik různých míst (prostředí) má pohádka mít – určuje se před psaním příběhu; bez hodnoty rozhodne AI */
+  placeCount?: PlaceCount;
   pageCount: number;
   textLength?: TextLength;
   language: string;
@@ -91,4 +103,14 @@ export type Book = {
   cardsRevisionUsed?: boolean;
   revisionUsed?: boolean;
   job?: Job | null;
+  /** texty stran před hromadnou úpravou (např. převod do minulého času) – pro „Vrátit texty“ */
+  textBackup?: { at: string; label: string; texts: Record<number, string> };
+  /** nejdál odemčený krok studia: 1 postavy, 2 příběh, 3 prostředí, 4 ilustrace */
+  stage?: number;
+  /**
+   * České překlady anglických zadání pro Gemini (vzhled, oblečení, scény, prostředí).
+   * Klíč např. "c:<id>:visual", "p:<n>:scene", "l:<id>:description", "atmosphere".
+   * en = anglický text, ke kterému překlad patří – když se anglický text změní, překlad je zastaralý.
+   */
+  cs?: Record<string, { en: string; cs: string }>;
 };

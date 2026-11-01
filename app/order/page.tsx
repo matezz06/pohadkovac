@@ -2,6 +2,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { STYLES } from "@/lib/styles";
+import StylePicker from "@/components/StylePicker";
+import PhotoThumb from "@/components/PhotoThumb";
+import { normalizePhotos } from "@/lib/photoFiles";
 import { PACKAGES } from "@/lib/packages";
 
 type C = { name: string; role: string; description: string; files: File[] };
@@ -17,8 +20,10 @@ export default function Order() {
   const [styleId, setStyleId] = useState(STYLES[0].id);
   const [theme, setTheme] = useState("");
   const [lesson, setLesson] = useState("");
+  const [places, setPlaces] = useState("");
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [converting, setConverting] = useState(0);
   const [err, setErr] = useState("");
 
   const upd = (i: number, patch: Partial<C>) => setChars((cs) => cs.map((c, j) => (j === i ? { ...c, ...patch } : c)));
@@ -39,6 +44,7 @@ export default function Order() {
     fd.set("styleId", styleId);
     fd.set("theme", theme);
     fd.set("lesson", lesson);
+    fd.set("places", places);
     fd.set("consent", "1");
     fd.set("characters", JSON.stringify(valid.map(({ files, ...c }, i) => ({ ...c, isHero: i === 0 }))));
     valid.forEach((c, i) => c.files.forEach((f) => fd.append(`photo_${i}`, f)));
@@ -80,9 +86,13 @@ export default function Order() {
               <label>Kdo to je<input value={c.role} onChange={(e) => upd(i, { role: e.target.value })} placeholder="strejda / náš pes, labrador" /></label>
               <label>Povaha a zajímavosti<textarea value={c.description} onChange={(e) => upd(i, { description: e.target.value })} /></label>
               <label>Fotky
-                <input type="file" accept="image/*" multiple onChange={(e) => upd(i, { files: Array.from(e.target.files ?? []).slice(0, 3) })} />
+                <input type="file" accept="image/*,.heic,.heif" multiple onChange={async (e) => {
+                  const picked = Array.from(e.target.files ?? []).slice(0, 3);
+                  setConverting((n) => n + 1);
+                  try { upd(i, { files: await normalizePhotos(picked) }); } finally { setConverting((n) => n - 1); }
+                }} />
               </label>
-              {c.files.length > 0 && <div className="photos">{c.files.map((f, k) => <img key={k} src={URL.createObjectURL(f)} alt="" />)}</div>}
+              {c.files.length > 0 && <div className="photos">{c.files.map((f, k) => <PhotoThumb key={k} file={f} />)}</div>}
             </div>
           ))}
         </div>
@@ -94,13 +104,10 @@ export default function Order() {
         <div className="card stack">
           <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
             <label>Věk dítěte<input type="number" min={1} max={10} value={age} onChange={(e) => setAge(Number(e.target.value))} /></label>
-            <label>Styl ilustrací
-              <select value={styleId} onChange={(e) => setStyleId(e.target.value)}>
-                {STYLES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-              </select>
-            </label>
           </div>
+          <StylePicker value={styleId} onChange={setStyleId} />
           <label>O čem má pohádka být (nepovinné)<textarea value={theme} onChange={(e) => setTheme(e.target.value)} maxLength={1000} /></label>
+          <label>Kde se má pohádka odehrávat (nepovinné)<textarea value={places} onChange={(e) => setPlaces(e.target.value)} maxLength={500} rows={2} placeholder="náš obývák, babiččina zahrada s jabloní, lanovka na Ještěd" /></label>
           <label>Co si má dítě odnést (nepovinné)<input value={lesson} onChange={(e) => setLesson(e.target.value)} maxLength={300} /></label>
         </div>
 
@@ -109,8 +116,9 @@ export default function Order() {
           Souhlasím se zpracováním nahraných fotek pro vytvoření pohádky. Mám svolení osob na fotkách (u dětí jsem zákonný zástupce).
         </label>
 
+        {converting > 0 && <p className="muted"><span className="spin" /> Připravuji fotky z iPhonu…</p>}
         {err && <p className="err">{err}</p>}
-        <div><button className="primary" disabled={busy}>{busy ? <><span className="spin" /> Nahrávám…</> : `Vytvořit pohádku (${pkg.priceCzk} Kč) →`}</button></div>
+        <div><button className="primary" disabled={busy || converting > 0}>{busy ? <><span className="spin" /> Nahrávám…</> : `Vytvořit pohádku (${pkg.priceCzk} Kč) →`}</button></div>
         <p className="muted">Platba zatím není napojená – jde o testovací verzi.</p>
       </form>
     </main>

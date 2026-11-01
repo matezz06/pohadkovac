@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { loadBook } from "@/lib/store";
 import PrintButton from "./PrintButton";
+import FitText from "./FitText";
 import { BRAND } from "@/lib/brand";
 import "./read.css";
 
@@ -17,6 +18,7 @@ export default async function Read({ params }: { params: Promise<{ id: string }>
 
   return (
     <main className="reader">
+      <FitText />
       <div className="toolbar no-print">
         <Link className="btn" href={book.customer ? `/b/${id}` : `/books/${id}`}>← Zpět</Link>
         <PrintButton />
@@ -29,7 +31,7 @@ export default async function Read({ params }: { params: Promise<{ id: string }>
       </section>
 
       {pages.map((p) => (
-        <section className="sheet" key={p.n}>
+        <section className={`sheet${p.n % 2 === 0 ? " flip" : ""}`} key={p.n}>
           <div className="art">{p.image ? <img src={src(p.image)} alt="" /> : <div className="missing">bez ilustrace</div>}</div>
           <div className="text"><p>{p.text}</p><span className="num">{p.n}</span></div>
         </section>

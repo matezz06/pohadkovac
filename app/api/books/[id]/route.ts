@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { deleteBook, loadBook, updateBook } from "@/lib/store";
 import type { Book } from "@/lib/types";
+import { markStale } from "@/lib/pipeline";
 
 export const runtime = "nodejs";
 type Ctx = { params: Promise<{ id: string }> };
@@ -23,14 +24,21 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (patch.customStyle !== undefined) b.customStyle = patch.customStyle;
     if (patch.theme !== undefined) b.theme = patch.theme;
     if (patch.lesson !== undefined) b.lesson = patch.lesson;
+    if (patch.places !== undefined) b.places = patch.places;
+    if (patch.placeCount !== undefined) b.placeCount = (["1", "2-3", "4-5"] as const).find((x) => x === patch.placeCount);
     if (patch.pageCount !== undefined) b.pageCount = Math.min(20, Math.max(3, Number(patch.pageCount)));
     if (patch.textLength !== undefined) b.textLength = patch.textLength;
-    if (patch.atmosphere !== undefined) b.atmosphere = patch.atmosphere;
+    if (patch.atmosphere !== undefined && patch.atmosphere !== b.atmosphere) {
+      b.atmosphere = patch.atmosphere;
+      markStale(b, (p) => p.n > 0);
+    }
     if (patch.locations !== undefined) {
       // změněný popis místa → staré prázdné pozadí zahodit, vznikne nové
       b.locations = patch.locations.map((l) => {
         const old = b.locations?.find((x) => x.id === l.id);
-        return old && old.description === l.description ? { ...l, plate: old.plate } : { ...l, plate: undefined };
+        if (old && old.description === l.description) return { ...l, plate: old.plate };
+        markStale(b, (p) => p.n > 0 && p.location === l.id);
+        return { ...l, plate: undefined };
       });
     }
     if (patch.page) {
@@ -38,6 +46,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
       if (p) {
         const { n, ...rest } = patch.page;
         if (rest.image && !(p.imageVersions ?? []).includes(rest.image)) delete rest.image;
+        if ((rest.scene !== undefined && rest.scene !== p.scene) || (rest.location !== undefined && rest.location !== p.location) ||
+          (rest.characters && rest.characters.join() !== p.characters.join())) markStale(b, (x) => x.n === p.n);
         Object.assign(p, rest);
         if (n === 0 && rest.text !== undefined) b.title = rest.text;
       }
